@@ -27,6 +27,14 @@ enum PrinterModel: String, CaseIterable, Identifiable {
         }
     }
 
+    /// P1/A1 series stream JPEG frames on port 6000; X1/H2 use RTSP, which is not supported.
+    var supportsCamera: Bool {
+        switch self {
+        case .p1s, .p1p, .a1, .a1mini: true
+        default: false
+        }
+    }
+
     var hasChamberSensor: Bool {
         switch self {
         case .p1p, .a1, .a1mini: false

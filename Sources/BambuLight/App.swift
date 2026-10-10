@@ -24,6 +24,7 @@ struct ContentView: View {
     @EnvironmentObject var p: Printer
     @AppStorage("flatView") private var flatView = false
     @State private var showSettings = false
+    @State private var showCamera = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -35,6 +36,14 @@ struct ContentView: View {
                         .keyboardShortcut(.cancelAction)
                         .buttonStyle(.borderedProminent).controlSize(.small)
                 } else if !showSettings {
+                    if p.mode == "lan" && p.isConfigured && p.model.supportsCamera {
+                        Button { showCamera.toggle() } label: {
+                            Image(systemName: showCamera ? "camera.fill" : "camera").imageScale(.large)
+                        }
+                        .buttonStyle(.plain)
+                        .help(showCamera ? "Hide camera" : "Show camera")
+                        .accessibilityLabel(showCamera ? "Hide camera" : "Show camera")
+                    }
                     Button { showSettings = true } label: { Image(systemName: "gearshape").imageScale(.large) }
                         .buttonStyle(.plain)
                         .help("Settings")
@@ -50,7 +59,8 @@ struct ContentView: View {
                 // Same total height as the printer view (scene + caption row), so switching never resizes the popover.
                 .frame(height: PrinterRig.viewHeight + PrinterRig.captionRowHeight)
             } else {
-                if flatView { PrinterFlatView() } else { Printer3DView() }
+                if showCamera { CameraView() }
+                else if flatView { PrinterFlatView() } else { Printer3DView() }
             }
 
             Divider()
@@ -59,6 +69,39 @@ struct ContentView: View {
         }
         .padding(14)
         .frame(width: 360)
+        // The popover closing resigns key; stop streaming video when nobody is looking.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in showCamera = false }
+    }
+}
+
+/// Live camera, same size as the printer view so switching does not resize the popover.
+struct CameraView: View {
+    @EnvironmentObject var p: Printer
+    @StateObject private var camera = CameraViewModel()
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack {
+                Color.black
+                if let image = camera.image {
+                    Image(nsImage: image).resizable().scaledToFit()
+                } else {
+                    VStack(spacing: 8) {
+                        if camera.message == "Connecting to camera…" { ProgressView().controlSize(.small) }
+                        Text(camera.message ?? "").font(.caption).multilineTextAlignment(.center)
+                            .foregroundStyle(.white.opacity(0.8)).padding(.horizontal, 20)
+                    }
+                }
+            }
+            .frame(height: PrinterRig.viewHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .accessibilityLabel("Printer camera")
+
+            HStack { Text("Live camera"); Spacer() }
+                .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
+        }
+        .onAppear { camera.start(host: p.host, accessCode: p.accessCode, serial: p.serial) }
+        .onDisappear { camera.stop() }
     }
 }
 

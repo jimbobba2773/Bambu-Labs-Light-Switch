@@ -1,7 +1,5 @@
 import Foundation
 import Network
-import CryptoKit
-import Security
 
 /// Minimal MQTT 3.1.1 client (QoS 0 only) over TLS — just enough for Bambu LAN mode.
 final class MQTTClient {
@@ -36,21 +34,13 @@ final class MQTTClient {
         lastReceived = Date()
         pinFailed = false
 
-        let tls = NWProtocolTLS.Options()
-        if !verifyCert {
-            // Printers use a self-signed certificate, so chain validation is skipped (LAN only).
-            // Instead the leaf certificate's SHA-256 is checked against a pinned value (trust on first use).
-            sec_protocol_options_set_verify_block(tls.securityProtocolOptions, { [weak self] _, trust, done in
-                let secTrust = sec_trust_copy_ref(trust).takeRetainedValue()
-                guard let pin,
-                      let leaf = (SecTrustCopyCertificateChain(secTrust) as? [SecCertificate])?.first else { done(pin == nil); return }
-                let fp = SHA256.hash(data: SecCertificateCopyData(leaf) as Data).map { String(format: "%02x", $0) }.joined()
-                let ok = pin(fp)
-                if !ok { self?.pinFailed = true }
-                done(ok)
-            }, queue)
+        let params: NWParameters
+        if verifyCert {
+            params = NWParameters(tls: NWProtocolTLS.Options())
+        } else {
+            // Printers use a self-signed certificate; see TLSSupport.
+            params = NWParameters(tls: TLSSupport.selfSigned(queue: queue, pin: pin) { [weak self] in self?.pinFailed = true })
         }
-        let params = NWParameters(tls: tls)
         let c = NWConnection(host: NWEndpoint.Host(host), port: NWEndpoint.Port(rawValue: port)!, using: params)
         conn = c
 
