@@ -4,6 +4,16 @@ All notable changes to Bambu Light are listed here. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-11
+
+No changes to how the app behaves. This release adds project infrastructure and is the first build produced by GitHub Actions.
+
+### Added
+- MIT license.
+- This changelog.
+- Automated release builds: pushing a version tag builds the universal app on GitHub and publishes the zip.
+- Continuous integration that runs the unit tests on every push.
+
 ## [1.0.0] - 2026-10-11
 
 First release.
@@ -27,5 +37,6 @@ First release.
 - An expired cloud session sends you back to sign-in.
 - The light switch confirms its state with the printer and corrects itself if the printer doesn't respond.
 
-[Unreleased]: https://github.com/jimbobba2773/Bambu-Labs-Light-Switch/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/jimbobba2773/Bambu-Labs-Light-Switch/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/jimbobba2773/Bambu-Labs-Light-Switch/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/jimbobba2773/Bambu-Labs-Light-Switch/releases/tag/v1.0.0
