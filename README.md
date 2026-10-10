@@ -1,5 +1,7 @@
 # Bambu Light
 
+[![Tests](https://github.com/jimbobba2773/Bambu-Labs-Light-Switch/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/jimbobba2773/Bambu-Labs-Light-Switch/actions/workflows/test.yml)
+
 A small macOS menu bar app for turning your Bambu Lab printer's light on and off, with live temperatures and print progress.
 
 - One-click chamber light switch (or **⌃⌥L** from anywhere)
