@@ -70,3 +70,7 @@ The app is signed with a development certificate, not notarized by Apple, so mac
 - LAN traffic stays on your network. Cloud mode talks only to Bambu's servers.
 - The cloud API is unofficial and may change or block clients without notice.
 - Not affiliated with Bambu Lab.
+
+## License
+
+[MIT](LICENSE)
