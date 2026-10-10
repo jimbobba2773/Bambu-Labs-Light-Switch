@@ -42,6 +42,10 @@ The model is detected from the serial number (P1S, P1P, X1 Carbon, X1, X1E, A1, 
 - The app is signed with the first "Apple Development" certificate in your keychain, which keeps Keychain access grants across rebuilds. Override with `SIGN_ID="..."`; it falls back to ad-hoc signing if none is found.
 - Set the version with `VERSION=1.1.0 ./build.sh`. The build number is a timestamp.
 
+## Changes
+
+See the [changelog](CHANGELOG.md).
+
 ## Sharing
 
 ```sh
