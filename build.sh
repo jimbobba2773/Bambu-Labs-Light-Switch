@@ -8,8 +8,10 @@ VERSION=${VERSION:-1.0.0}      # marketing version; override with VERSION=1.1.0 
 BUILD=$(date +%y%m%d%H%M)       # build number, increases with every build
 # Build products live on the local disk: the project folder is on a network share where SwiftPM's caches break.
 SCRATCH=${BAMBULIGHT_BUILD_DIR:-$HOME/Library/Caches/BambuLight/build}
-swift build -c release --scratch-path "$SCRATCH"
-BIN=$(swift build -c release --scratch-path "$SCRATCH" --show-bin-path)
+ARCH_FLAGS=()   # set ARCHS="arm64 x86_64" for a universal build
+for a in ${=ARCHS}; do ARCH_FLAGS+=(--arch $a); done
+swift build -c release --scratch-path "$SCRATCH" $ARCH_FLAGS
+BIN=$(swift build -c release --scratch-path "$SCRATCH" $ARCH_FLAGS --show-bin-path)
 
 DEST=~/Applications/BambuLight.app
 STAGE=$(mktemp -d)

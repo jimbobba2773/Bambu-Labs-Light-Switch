@@ -42,6 +42,14 @@ The model is detected from the serial number (P1S, P1P, X1 Carbon, X1, X1E, A1, 
 - The app is signed with the first "Apple Development" certificate in your keychain, which keeps Keychain access grants across rebuilds. Override with `SIGN_ID="..."`; it falls back to ad-hoc signing if none is found.
 - Set the version with `VERSION=1.1.0 ./build.sh`. The build number is a timestamp.
 
+## Sharing
+
+```sh
+./package.sh   # builds a universal (Apple silicon + Intel) app and writes dist/BambuLight-<version>.zip
+```
+
+The app is signed with a development certificate, not notarized by Apple, so macOS will warn on the first launch on someone else's Mac. They can unzip it, move it to Applications, then right-click the app, choose **Open**, and confirm. If macOS says the app is damaged, run `xattr -dr com.apple.quarantine /Applications/BambuLight.app` once. Notarizing needs a paid Apple Developer ID.
+
 ## Project layout
 
 | File | Purpose |
