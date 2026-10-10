@@ -1,0 +1,60 @@
+name: Release
+
+# Push a tag like v1.1.0 to build the universal app and publish it as a GitHub release.
+# Run manually (Actions tab) to build the zip as a downloadable artifact without publishing.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=0.0.0-dev" >> "$GITHUB_ENV"
+          fi
+
+      - name: Test
+        run: swift test
+
+      # No signing certificate exists on the runner, so build.sh falls back to an ad-hoc signature.
+      - name: Build and zip (universal)
+        run: ./package.sh
+
+      - name: Release notes
+        if: github.ref_type == 'tag'
+        run: |
+          # The changelog section for this version, then the standard install instructions.
+          awk -v v="$VERSION" 'index($0, "## [" v "]") == 1 { f = 1; next } /^## \[/ { f = 0 } f' CHANGELOG.md | grep -v '^\[.*\]: ' > notes.md
+          if [[ ! -s notes.md ]]; then echo "No CHANGELOG.md entry for $VERSION" >&2; exit 1; fi
+          cat .github/release-install.md >> notes.md
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ZIP="dist/BambuLight-$VERSION.zip"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$ZIP" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$ZIP" --verify-tag --title "Bambu Light $VERSION" --notes-file notes.md
+          fi
+
+      - name: Keep the zip as an artifact (manual runs)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: BambuLight-dev
+          path: dist/*.zip
