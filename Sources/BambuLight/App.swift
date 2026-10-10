@@ -25,6 +25,8 @@ struct ContentView: View {
     @AppStorage("flatView") private var flatView = false
     @State private var showSettings = false
     @State private var showCamera = false
+    @AppStorage("askedLaunchAtLogin") var askedLaunchAtLogin = false
+    @State var launchPromptError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -63,6 +65,10 @@ struct ContentView: View {
                 else if flatView { PrinterFlatView() } else { Printer3DView() }
             }
 
+            if p.isConfigured && !askedLaunchAtLogin && !showSettings && SMAppService.mainApp.status != .enabled {
+                launchPrompt
+            }
+
             Divider()
             Button("Quit") { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
@@ -71,6 +77,33 @@ struct ContentView: View {
         .frame(width: 360)
         // The popover closing resigns key; stop streaming video when nobody is looking.
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in showCamera = false }
+    }
+}
+
+/// One-time offer, shown after the printer is set up.
+extension ContentView {
+    var launchPrompt: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Start Bambu Light when you log in?").font(.callout.weight(.medium))
+            if let launchPromptError { Text(launchPromptError).font(.caption).foregroundStyle(.red) }
+            HStack {
+                Button("Yes") {
+                    do {
+                        try SMAppService.mainApp.register()
+                        askedLaunchAtLogin = true
+                    } catch {
+                        Log.app.error("Launch at login failed: \(error.localizedDescription, privacy: .public)")
+                        launchPromptError = "Couldn't turn on: \(error.localizedDescription)"
+                    }
+                }
+                .buttonStyle(.borderedProminent).controlSize(.small)
+                Button("No thanks") { askedLaunchAtLogin = true }.controlSize(.small)
+                Text("You can change this in settings.").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.quaternary))
     }
 }
 
@@ -164,6 +197,16 @@ struct SettingsForm: View {
             Toggle("Simple flat view (instead of 3D)", isOn: $flatView)
             Toggle("Notify when a print finishes or fails", isOn: p.$notifyPrints)
             Toggle("Shortcut ⌃⌥L toggles the light", isOn: p.$lightHotkey)
+            Toggle("Schedule the light", isOn: p.$scheduleEnabled)
+            if p.scheduleEnabled {
+                HStack {
+                    DatePicker("On", selection: minuteBinding(p.$scheduleOn), displayedComponents: .hourAndMinute)
+                    DatePicker("Off", selection: minuteBinding(p.$scheduleOff), displayedComponents: .hourAndMinute)
+                }
+                .labelsHidden().datePickerStyle(.field)
+                Text("Turns the light on at the first time and off at the second, every day while the app is running and connected.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Toggle("Launch at login", isOn: Binding(get: { launchAtLogin }, set: { on in
                 do {
                     if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
@@ -181,6 +224,11 @@ struct SettingsForm: View {
         .onChange(of: p.notifyPrints) { _ in p.applyPreferences() }
         .onChange(of: p.lightHotkey) { _ in p.applyPreferences() }
         .task { if p.mode == "cloud", !p.cloudToken.isEmpty, p.devices.isEmpty { p.refreshDevices() } }
+    }
+
+    private func minuteBinding(_ minutes: Binding<Int>) -> Binding<Date> {
+        Binding(get: { LightSchedule.date(forMinute: minutes.wrappedValue) },
+                set: { minutes.wrappedValue = LightSchedule.minuteOfDay($0) })
     }
 
     private var lanForm: some View {

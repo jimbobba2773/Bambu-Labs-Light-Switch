@@ -83,3 +83,45 @@ final class CertPinTests: XCTestCase {
         XCTAssertTrue(CertPins.check(other, "bbbb"))
     }
 }
+
+final class LightScheduleTests: XCTestCase {
+    func testDaytimeWindow() {
+        XCTAssertEqual(LightSchedule.shouldBeOn(minute: 8 * 60, on: 8 * 60, off: 18 * 60), true)
+        XCTAssertEqual(LightSchedule.shouldBeOn(minute: 12 * 60, on: 8 * 60, off: 18 * 60), true)
+        XCTAssertEqual(LightSchedule.shouldBeOn(minute: 18 * 60, on: 8 * 60, off: 18 * 60), false)
+        XCTAssertEqual(LightSchedule.shouldBeOn(minute: 7 * 60 + 59, on: 8 * 60, off: 18 * 60), false)
+    }
+
+    func testWindowCrossingMidnight() {
+        XCTAssertEqual(LightSchedule.shouldBeOn(minute: 23 * 60, on: 20 * 60, off: 6 * 60), true)
+        XCTAssertEqual(LightSchedule.shouldBeOn(minute: 2 * 60, on: 20 * 60, off: 6 * 60), true)
+        XCTAssertEqual(LightSchedule.shouldBeOn(minute: 6 * 60, on: 20 * 60, off: 6 * 60), false)
+        XCTAssertEqual(LightSchedule.shouldBeOn(minute: 12 * 60, on: 20 * 60, off: 6 * 60), false)
+    }
+
+    func testEqualTimesMeanNoSchedule() { XCTAssertNil(LightSchedule.shouldBeOn(minute: 100, on: 500, off: 500)) }
+
+    func testMinuteConversionRoundTrip() {
+        for m in [0, 59, 60, 725, 1439] { XCTAssertEqual(LightSchedule.minuteOfDay(LightSchedule.date(forMinute: m)), m) }
+    }
+}
+
+final class LightNodeTests: XCTestCase {
+    func testPrefersModelNodeWhenReported() {
+        XCTAssertEqual(PrinterModel.chooseLightNode(model: .p1s, reported: ["chamber_light"]), "chamber_light")
+        XCTAssertEqual(PrinterModel.chooseLightNode(model: .a1, reported: ["work_light", "chamber_light"]), "work_light")
+    }
+    func testFallsBackToWhatThePrinterReports() {
+        XCTAssertEqual(PrinterModel.chooseLightNode(model: .a1, reported: ["chamber_light"]), "chamber_light")
+        XCTAssertEqual(PrinterModel.chooseLightNode(model: .p1s, reported: ["work_light"]), "work_light")
+        XCTAssertEqual(PrinterModel.chooseLightNode(model: .p1s, reported: ["strange_light"]), "strange_light")
+    }
+    func testUsesModelDefaultBeforeAnyReport() {
+        XCTAssertEqual(PrinterModel.chooseLightNode(model: .a1mini, reported: []), "work_light")
+        XCTAssertEqual(PrinterModel.chooseLightNode(model: .p1s, reported: []), "chamber_light")
+    }
+    func testOpenFrameModels() {
+        XCTAssertTrue(PrinterModel.a1.isOpenFrame); XCTAssertTrue(PrinterModel.a1mini.isOpenFrame)
+        XCTAssertFalse(PrinterModel.p1s.isOpenFrame); XCTAssertFalse(PrinterModel.p1p.isOpenFrame)
+    }
+}

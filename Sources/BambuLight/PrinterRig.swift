@@ -53,13 +53,18 @@ final class PrinterRig {
     private let bedMat = SCNMaterial()
     private let part = SCNNode()
 
-    init() {
+    private let openFrame: Bool
+    private let mini: Bool
+
+    init(model: PrinterModel = .p1s) {
+        openFrame = model.isOpenFrame
+        mini = model == .a1mini
         scene.background.contents = NSColor.clear
         scene.lightingEnvironment.contents = Self.studioImage()
         scene.lightingEnvironment.intensity = 0.9
 
         buildMaterials()
-        buildBody()
+        if openFrame { buildOpenFrame() } else { buildBody() }
         buildInterior()
         buildLights()
         buildGround()
@@ -83,7 +88,7 @@ final class PrinterRig {
     func update(lightOn: Bool, nozzleHeat: Double, bedHeat: Double, printing: Bool, animated: Bool = true) {
         SCNTransaction.begin()
         SCNTransaction.animationDuration = animated ? 0.35 : 0
-        omni.light?.intensity = lightOn ? 850 : 0
+        omni.light?.intensity = lightOn ? (openFrame ? 260 : 850) : 0
         ledMat.emission.contents = lightOn ? NSColor.white : NSColor(white: 0.04, alpha: 1)
         glassMat.emission.contents = lightOn ? NSColor(red: 1, green: 0.96, blue: 0.88, alpha: 1) : NSColor.black
         glassMat.emission.intensity = lightOn ? 0.32 : 0
@@ -191,20 +196,44 @@ final class PrinterRig {
         box(3.2, 0.03, 0.05, at: SCNVector3(0, 3.82, -1.75), chamfer: 0.005, ledMat)
     }
 
+    /// Half the distance between the two Z posts (open-frame models).
+    private var postX: CGFloat { mini ? 1.5 : 1.78 }
+
+    /// A1 series: open frame, a base the bed slides on, and two Z posts carrying the X gantry. No enclosure.
+    private func buildOpenFrame() {
+        let s: CGFloat = mini ? 0.85 : 1
+        let frame = mat(NSColor(white: 0.13, alpha: 1), metal: 0.35, rough: 0.42)
+        let base = mat(NSColor(red: 0.20, green: 0.19, blue: 0.18, alpha: 1), metal: 0.3, rough: 0.5)
+        let accent = mat(NSColor(red: 0.05, green: 0.62, blue: 0.58, alpha: 1), metal: 0.1, rough: 0.4)
+        box(3.9 * s, 0.5, 3.9 * s, at: SCNVector3(0, 0.25, 0), chamfer: 0.07, base)
+        for sx: CGFloat in [-1, 1] {
+            box(0.3, 3.0, 0.36, at: SCNVector3(sx * postX, 2.0, -0.4), chamfer: 0.04, frame)      // Z post
+            box(0.32, 0.12, 0.38, at: SCNVector3(sx * postX, 3.52, -0.4), chamfer: 0.03, accent)   // post cap
+        }
+        // Rear plate of the X gantry, behind the rods
+        box(2 * postX - 0.3, 0.55, 0.12, at: SCNVector3(0, 2.98, -0.38), chamfer: 0.02, frame)
+        // Small display on the front of the base
+        let screen = mat(NSColor(white: 0.93, alpha: 1), metal: 0, rough: 0.3)
+        screen.emission.contents = NSColor(white: 0.55, alpha: 1)
+        box(0.5, 0.11, 0.03, at: SCNVector3(1.2 * s, 0.3, 1.95 * s + 0.005), chamfer: 0.01, screen)
+    }
+
     private func buildInterior() {
         let metal = mat(NSColor(white: 0.62, alpha: 1), metal: 0.95, rough: 0.28)
         let dark = mat(NSColor(white: 0.10, alpha: 1), metal: 0.3, rough: 0.5)
         let teal = mat(NSColor(red: 0.05, green: 0.62, blue: 0.58, alpha: 1), metal: 0.1, rough: 0.4)
 
         // Z lead screws (back corners) and X-axis rods
-        for sx: CGFloat in [-1, 1] { rod(0.05, 3.2, at: SCNVector3(sx * 1.72, 2.15, -1.55), axis: "y", metal) }
-        rod(0.045, 3.45, at: SCNVector3(0, 3.1, -0.15), axis: "x", metal)
-        rod(0.045, 3.45, at: SCNVector3(0, 2.86, -0.15), axis: "x", metal)
+        if !openFrame { for sx: CGFloat in [-1, 1] { rod(0.05, 3.2, at: SCNVector3(sx * 1.72, 2.15, -1.55), axis: "y", metal) } }
+        let rodLen: CGFloat = openFrame ? 2 * postX - 0.2 : 3.45
+        rod(0.045, rodLen, at: SCNVector3(0, 3.1, -0.15), axis: "x", metal)
+        rod(0.045, rodLen, at: SCNVector3(0, 2.86, -0.15), axis: "x", metal)
 
         // Heated bed: Y rails, carriage, build plate
-        for sx: CGFloat in [-1, 1] { rod(0.04, 3.3, at: SCNVector3(sx * 1.05, 0.85, 0), axis: "z", metal) }
-        box(2.75, 0.12, 2.75, at: SCNVector3(0, 1.0, 0), chamfer: 0.02, dark)
-        box(2.55, 0.05, 2.55, at: SCNVector3(0, 1.145, 0), chamfer: 0.01, bedMat)
+        let bs: CGFloat = mini ? 0.85 : 1
+        for sx: CGFloat in [-1, 1] { rod(0.04, 3.3 * bs, at: SCNVector3(sx * 1.05 * bs, 0.85, 0), axis: "z", metal) }
+        box(2.75 * bs, 0.12, 2.75 * bs, at: SCNVector3(0, 1.0, 0), chamfer: 0.02, dark)
+        box(2.55 * bs, 0.05, 2.55 * bs, at: SCNVector3(0, 1.145, 0), chamfer: 0.01, bedMat)
 
         // Print in progress
         let pg = SCNBox(width: 0.55, height: 0.5, length: 0.55, chamferRadius: 0.02); pg.materials = [teal]
@@ -218,6 +247,10 @@ final class PrinterRig {
         let rn = SCNNode(geometry: ring); rn.position = SCNVector3(0, 0, 0.26); rn.eulerAngles.x = .pi / 2
         head.addChildNode(rn)
         box(0.2, 0.16, 0.2, at: SCNVector3(0, -0.29, 0), chamfer: 0.01, metal, in: head)
+        if openFrame {
+            // Work light: a small LED bar on the front of the toolhead
+            box(0.34, 0.05, 0.04, at: SCNVector3(0, -0.17, 0.27), chamfer: 0.005, ledMat, in: head)
+        }
         let cone = SCNCone(topRadius: 0.07, bottomRadius: 0.01, height: 0.14); cone.materials = [nozzleMat]
         let cn = SCNNode(geometry: cone); cn.position = SCNVector3(0, -0.44, 0)
         head.addChildNode(cn)
@@ -227,7 +260,7 @@ final class PrinterRig {
         let o = SCNLight(); o.type = .omni
         o.color = NSColor(red: 1, green: 0.97, blue: 0.92, alpha: 1)
         o.attenuationStartDistance = 1; o.attenuationEndDistance = 7; o.attenuationFalloffExponent = 1
-        omni.light = o; omni.position = SCNVector3(0, 3.5, 0.4)
+        omni.light = o; omni.position = openFrame ? SCNVector3(0.1, 2.6, 0.9) : SCNVector3(0, 3.5, 0.4)
         scene.rootNode.addChildNode(omni)
 
         let key = SCNLight(); key.type = .directional; key.intensity = 850

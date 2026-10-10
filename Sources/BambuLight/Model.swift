@@ -60,3 +60,34 @@ func spokenTemp(_ name: String, _ value: Double?, _ target: Double?) -> String {
     if let t = target, t > 0 { s += ", target \(Int(t.rounded()))" }
     return s
 }
+
+extension PrinterModel {
+    /// A1 series printers have no enclosure.
+    var isOpenFrame: Bool { self == .a1 || self == .a1mini }
+
+    /// Which light node to control. Prefers what the printer itself reports over the model's usual name,
+    /// so a model whose light is named differently than expected still works.
+    static func chooseLightNode(model: PrinterModel, reported: [String]) -> String {
+        if reported.contains(model.lightNode) { return model.lightNode }
+        for candidate in ["chamber_light", "work_light"] where reported.contains(candidate) { return candidate }
+        return reported.first ?? model.lightNode
+    }
+}
+
+/// Daily on/off schedule for the light, in minutes since midnight.
+enum LightSchedule {
+    /// Whether the light should be on at `minute`. Handles windows that cross midnight; nil when on == off.
+    static func shouldBeOn(minute: Int, on: Int, off: Int) -> Bool? {
+        if on == off { return nil }
+        return on < off ? (minute >= on && minute < off) : (minute >= on || minute < off)
+    }
+
+    static func minuteOfDay(_ date: Date, calendar: Calendar = .current) -> Int {
+        let c = calendar.dateComponents([.hour, .minute], from: date)
+        return (c.hour ?? 0) * 60 + (c.minute ?? 0)
+    }
+
+    static func date(forMinute m: Int, calendar: Calendar = .current) -> Date {
+        calendar.date(bySettingHour: m / 60, minute: m % 60, second: 0, of: Date()) ?? Date()
+    }
+}

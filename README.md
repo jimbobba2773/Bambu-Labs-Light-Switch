@@ -6,6 +6,7 @@ A small macOS menu bar app for turning your Bambu Lab printer's light on and off
 - Nozzle, bed and chamber temperatures, print progress and time remaining
 - 3D or simple flat view of the printer
 - Notification when a print finishes or fails
+- Optional daily on/off schedule for the light
 - Live camera view on P1S, P1P, A1 and A1 mini over LAN (turn on LAN mode liveview on the printer)
 - Works over your local network (LAN mode) or through Bambu Cloud
 - Finds printers on your network automatically
@@ -28,7 +29,7 @@ Pick **Bambu Cloud**, choose your region (Global or China), sign in (verificatio
 
 ### Models
 
-The model is detected from the serial number (P1S, P1P, X1 Carbon, X1, X1E, A1, A1 mini, H2D) and can be overridden in settings. The model decides which light is controlled and whether a chamber temperature is shown. The drawing is always an enclosed P1S.
+The model is detected from the serial number (P1S, P1P, X1 Carbon, X1, X1E, A1, A1 mini, H2D) and can be overridden in settings. The model decides which light is controlled and whether a chamber temperature is shown. The A1 and A1 mini are drawn as open frames; other models are drawn as an enclosed P1S.
 
 ## Building
 

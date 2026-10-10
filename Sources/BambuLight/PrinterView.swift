@@ -39,28 +39,32 @@ struct PrinterFlatView: View {
         GeometryReader { g in
             let w = g.size.width, h = g.size.height
             let on = p.lightOn
+            let open = p.model.isOpenFrame
             let railY = h * 0.27
             let headX = w * 0.45
             ZStack {
                 // Smoked glass, brightened by the chamber light
                 RoundedRectangle(cornerRadius: 4)
                     .fill(LinearGradient(
-                        colors: on ? [Color(red: 1, green: 0.99, blue: 0.96), Color(red: 0.92, green: 0.91, blue: 0.88)]
+                        colors: open ? (on ? [Color.white.opacity(0.30), Color.white.opacity(0.10)] : [Color.white.opacity(0.05), Color.white.opacity(0.02)])
+                         : on ? [Color(red: 1, green: 0.99, blue: 0.96), Color(red: 0.92, green: 0.91, blue: 0.88)]
                                    : [Color(white: 0.16), Color(white: 0.06)],
                         startPoint: .top, endPoint: .bottom))
                     .shadow(color: on ? .white.opacity(0.35) : .clear, radius: 12)
 
                 // Z lead screws at the sides
                 ForEach([6.0, w - 6.0], id: \.self) { x in
-                    Rectangle().fill(Color(white: on ? 0.55 : 0.28)).frame(width: 2.5, height: h - 10).position(x: x, y: h / 2)
+                    Rectangle().fill(open ? Color(white: on ? 0.50 : 0.22) : Color(white: on ? 0.55 : 0.28))
+                        .frame(width: open ? 9 : 2.5, height: open ? h - 4 : h - 10).position(x: open ? (x < w / 2 ? 5 : w - 5) : x, y: h / 2)
                 }
 
                 // LED strip under the lid
-                Capsule()
+                if !open { Capsule()
                     .fill(on ? Color.white : Color(white: 0.22))
                     .frame(width: w * 0.8, height: 3)
                     .shadow(color: on ? .white : .clear, radius: 5)
                     .position(x: w / 2, y: 7)
+                }
 
                 // X-axis carbon rod
                 Rectangle().fill(Color(white: on ? 0.40 : 0.30)).frame(width: w - 12, height: 4).position(x: w / 2, y: railY)
@@ -81,16 +85,17 @@ struct PrinterFlatView: View {
                 }
 
                 // Glass gloss
-                Path { p in
+                if !open { Path { p in
                     p.move(to: CGPoint(x: w * 0.12, y: 0)); p.addLine(to: CGPoint(x: w * 0.42, y: 0))
                     p.addLine(to: CGPoint(x: w * 0.12, y: h)); p.addLine(to: CGPoint(x: 0, y: h))
                     p.addLine(to: CGPoint(x: 0, y: h * 0.5)); p.closeSubpath()
                 }
                 .fill(.white.opacity(on ? 0.12 : 0.06))
                 .allowsHitTesting(false)
+                }
 
                 // Door frame
-                RoundedRectangle(cornerRadius: 4).strokeBorder(Color(white: 0.07), lineWidth: 3)
+                if !open { RoundedRectangle(cornerRadius: 4).strokeBorder(Color(white: 0.07), lineWidth: 3) }
 
                 // Temperatures
                 pill(icon: "flame", name: "Nozzle", value: p.nozzle, target: p.nozzleTarget)

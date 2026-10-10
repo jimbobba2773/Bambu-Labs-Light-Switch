@@ -26,6 +26,9 @@ final class Printer: ObservableObject {
     @AppStorage("cloudRegion") var cloudRegion = CloudRegion.global.rawValue
     @AppStorage("notifyPrints") var notifyPrints = true
     @AppStorage("lightHotkey") var lightHotkey = true
+    @AppStorage("scheduleEnabled") var scheduleEnabled = false
+    @AppStorage("scheduleOn") var scheduleOn = 18 * 60       // minutes since midnight
+    @AppStorage("scheduleOff") var scheduleOff = 23 * 60
     @AppStorage("modelChoice") var modelChoice = "auto"   // "auto" = detect from the serial number
     @Published var accessCode: String = Keychain.read("accessCode") ?? ""
     @Published var cloudToken: String = Keychain.read("cloudToken") ?? ""
@@ -38,6 +41,9 @@ final class Printer: ObservableObject {
     private var pendingLight: (state: Bool, until: Date)?
     private var reconnectTask: Task<Void, Never>?
     private var reconnectAttempt = 0
+    private var reportedLightNodes: [String] = []
+    private var lastScheduled: Bool?
+    private var pendingScheduled: Bool?
     private let hotKey = HotKey()
 
     init() {
@@ -56,10 +62,19 @@ final class Printer: ObservableObject {
         }
         hotKey.onPress = { [weak self] in Task { @MainActor in self?.toggleFromHotKey() } }
         applyPreferences()
+        Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 20_000_000_000)
+                self?.scheduleTick()
+            }
+        }
         if isConfigured { connect() }
     }
 
     var model: PrinterModel { PrinterModel(rawValue: modelChoice) ?? PrinterModel.detect(serial: serial) ?? .p1s }
+
+    /// The light to control: what the printer reports if it differs from the model's usual name.
+    var lightNode: String { PrinterModel.chooseLightNode(model: model, reported: reportedLightNodes) }
 
     private var api: CloudAPI { CloudAPI(region: CloudRegion(rawValue: cloudRegion) ?? .global) }
 
@@ -95,6 +110,22 @@ final class Printer: ObservableObject {
     func applyPreferences() {
         if lightHotkey { hotKey.register() } else { hotKey.unregister() }
         if notifyPrints { Notifier.requestPermission() }
+    }
+
+    /// Applies the daily schedule when it flips between on and off. It acts on changes only, so enabling it or
+    /// launching the app never overrides the light; a change missed while offline or asleep is applied once connected.
+    func scheduleTick(now: Date = Date()) {
+        guard scheduleEnabled,
+              let desired = LightSchedule.shouldBeOn(minute: LightSchedule.minuteOfDay(now), on: scheduleOn, off: scheduleOff) else {
+            lastScheduled = nil; pendingScheduled = nil
+            return
+        }
+        if let last = lastScheduled, last != desired { pendingScheduled = desired }
+        lastScheduled = desired
+        if let want = pendingScheduled, connected {
+            pendingScheduled = nil
+            if lightOn != want { setLight(want) }
+        }
     }
 
     private func toggleFromHotKey() {
@@ -227,7 +258,7 @@ final class Printer: ObservableObject {
             self.pendingLight = nil
             if self.connected { self.requestFullStatus() } else { self.lightOn = !on }
         }
-        send(["system": ["sequence_id": "0", "command": "ledctrl", "led_node": model.lightNode,
+        send(["system": ["sequence_id": "0", "command": "ledctrl", "led_node": lightNode,
                          "led_mode": on ? "on" : "off", "led_on_time": 500, "led_off_time": 500,
                          "loop_times": 0, "interval_time": 0]])
     }
@@ -261,8 +292,12 @@ final class Printer: ObservableObject {
         }
         if let v = num("mc_percent") { progress = Int(v) }
         if let v = num("mc_remaining_time") { remainingMinutes = Int(v) }
+        if let lights = p["lights_report"] as? [[String: Any]] {
+            let nodes = lights.compactMap { $0["node"] as? String }
+            if !nodes.isEmpty { reportedLightNodes = nodes }
+        }
         if let lights = p["lights_report"] as? [[String: Any]],
-           let l = lights.first(where: { $0["node"] as? String == model.lightNode }),
+           let l = lights.first(where: { $0["node"] as? String == lightNode }),
            let mode = l["mode"] as? String {
             let reported = (mode == "on")
             if let pend = pendingLight {

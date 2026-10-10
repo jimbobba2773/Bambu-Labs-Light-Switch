@@ -2,13 +2,17 @@ import SwiftUI
 import SceneKit
 
 struct SceneContainer: NSViewRepresentable {
+    var model: PrinterModel
     var lightOn: Bool
     var nozzleHeat: Double
     var bedHeat: Double
     var printing: Bool
 
-    final class Coordinator { let rig = PrinterRig() }
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    final class Coordinator {
+        let rig: PrinterRig
+        init(model: PrinterModel) { rig = PrinterRig(model: model) }
+    }
+    func makeCoordinator() -> Coordinator { Coordinator(model: model) }
 
     func makeNSView(context: Context) -> SCNView {
         let rig = context.coordinator.rig
@@ -38,10 +42,12 @@ struct Printer3DView: View {
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
-                SceneContainer(lightOn: p.lightOn,
+                SceneContainer(model: p.model,
+                               lightOn: p.lightOn,
                                nozzleHeat: min(max(((p.nozzle ?? 0) - 40) / 160, 0), 1),
                                bedHeat: min(max(((p.bed ?? 0) - 35) / 70, 0), 1),
                                printing: printing)
+                .id(p.model)   // rebuild the scene when the model changes
                 GeometryReader { g in callouts(size: g.size) }
             }
             .frame(height: PrinterRig.viewHeight)
